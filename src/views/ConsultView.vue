@@ -10,10 +10,11 @@ import { downloadText } from '../download';
 import { t } from '../i18n';
 import CoverageTable from '../components/CoverageTable.vue';
 import SearchField from '../components/SearchField.vue';
+import { useImportStatus } from '../composables/useImportStatus';
 
 const props = defineProps<{ context: OnestockContext }>();
-const emit = defineEmits<{ openImport: [id: string] }>();
 
+const importStatus = useImportStatus(props.context);
 const itemIds = ref<string[]>([]);
 const endpointIds = ref<string[]>([]);
 const itemField = ref<InstanceType<typeof SearchField>>();
@@ -69,7 +70,7 @@ async function search() {
   // Text typed but not validated yet counts too.
   itemField.value?.commit();
   endpointField.value?.commit();
-  if (!itemIds.value.length || !endpointIds.value.length || loading.value) return;
+  if (loading.value) return;
   error.value = '';
   success.value = '';
   loading.value = true;
@@ -78,18 +79,25 @@ async function search() {
     show(coverages);
     searched.value = { items: itemIds.value.length, endpoints: endpointIds.value.length };
   } catch (err) {
-    error.value = (err as Error).message;
+    const message = (err as Error).message;
+    const status = (err as { status?: number }).status;
+    // The API documents both lists as required: say so when a search without filter is refused.
+    const unfiltered = !itemIds.value.length || !endpointIds.value.length;
+    error.value = unfiltered && status === 400 ? `${message} — ${t('consult.filterRequired')}` : message;
   } finally {
     loading.value = false;
   }
 }
 
-/** Found coverages first, then the pairs asked for that have none (to be filled in). */
+/**
+ * Found coverages first, then the pairs asked for that have none (to be filled in): only when both items and
+ * stock locations were given, a search without one of them only lists what exists.
+ */
 function show(coverages: Coverage[]) {
   const unique = new Map(coverages.map((c) => [coverageKey(c), c]));
   rows.value = [
     ...[...unique.values()].map((c) => rowOf(c, c)),
-    ...missingPairs(itemIds.value, endpointIds.value, [...unique.values()]).map((pair: Pick<Coverage, 'item_id' | 'endpoint_id'>) => rowOf(pair)),
+    ...missingPairs(itemIds.value, itemIds.value.length ? endpointIds.value : [], [...unique.values()]).map((pair: Pick<Coverage, 'item_id' | 'endpoint_id'>) => rowOf(pair)),
   ];
 }
 
@@ -109,7 +117,7 @@ async function save() {
     const result = await uploadCoverages(props.context, coverages);
     if (result.mode === 'async') {
       success.value = t('consult.savedAsync', { n: coverages.length, id: result.importId! });
-      emit('openImport', result.importId!);
+      importStatus.track(result.importId!);
     } else {
       success.value = t('consult.saved', { n: coverages.length });
       // OneStock applies the coverages it accepted: they become the reference values.
@@ -138,7 +146,7 @@ function exportCsv() {
         :placeholder="t('consult.itemPlaceholder')"
         :remove-label="t('table.remove')"
         :suggest="suggestItems"
-        :min-chars="2"
+        :min-chars="0"
         :loading-text="t('consult.searching')"
         :empty-text="t('consult.noMatch')"
         @search="search"
@@ -150,7 +158,7 @@ function exportCsv() {
         :placeholder="t('consult.endpointPlaceholder')"
         :remove-label="t('table.remove')"
         :suggest="suggestEndpoints"
-        :min-chars="1"
+        :min-chars="0"
         :loading-text="t('consult.searching')"
         :empty-text="t('consult.noMatch')"
         @search="search"
@@ -166,7 +174,6 @@ function exportCsv() {
           type="secondary"
           :text="t('consult.search')"
           :pending="loading"
-          :disabled="!itemIds.length || !endpointIds.length"
           @click="search"
         />
       </div>
@@ -175,6 +182,11 @@ function exportCsv() {
 
     <OsAlert v-if="error" type="danger" :title="t('common.error')" :subtitle="error" />
     <OsAlert v-if="success" type="success" :subtitle="success" />
+    <OsAlert
+      v-if="importStatus.current.value"
+      :type="importStatus.done.value ? (importStatus.current.value.details?.invalid_stock_coverages ? 'warning' : 'success') : 'neutral'"
+      :subtitle="importStatus.error.value || importStatus.text.value"
+    />
 
     <OsCardLayout v-if="searched">
       <div class="group">

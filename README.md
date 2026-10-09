@@ -16,12 +16,14 @@ nouvelle). Les messages d'erreur renvoyés par les API (OneStock, Settings) sont
 
 | Onglet | Rôle | API OneStock |
 | --- | --- | --- |
-| **Consulter** | Barre de filtres au format OneStock : Article et Lieu de stock (valeurs multiples, suggestions OneStock pendant la saisie), Assortiment, Couverture. Modification en ligne des ventes / de l'assortiment, saisie des couples sans couverture, export CSV | `GET /stock_coverages`, `POST /stock_coverages` ; suggestions : `GET /items` (`pattern`), `GET /endpoints` |
-| **Mettre à jour** | Saisie manuelle (complétion OneStock sur l'article et le lieu de stock de chaque ligne) ou import CSV (`item_id;endpoint_id;sales_per_period;assortment`) ; ≤ 100 lignes : envoi direct, au-delà : import asynchrone par lots de 100. Réinitialisation des couvertures jusqu'à une date (avec confirmation) | `POST /stock_coverages`, `POST /stock_coverage_imports`, `POST /stock_coverage_imports/{id}/stock_coverages`, `PATCH /stock_coverage_imports/{id}`, `PATCH /reset_stock_coverages` |
-| **Imports** | Suivi des imports asynchrones (statut, lots, lignes importées / en erreur), actualisation automatique de l'import qui vient d'être envoyé | `GET /stock_coverage_imports`, `GET /stock_coverage_imports/{id}` |
-| **Paramètres** | Saisie du token OneStock et de la racine de l'API, lieux de stock par défaut, libellé de la période ; test de connexion | API Settings |
+| **Consulter** | Barre de filtres au format OneStock, tous facultatifs (recherche possible sans paramètre) : Article et Lieu de stock (valeurs multiples, suggestions OneStock dès le focus), Assortiment, Couverture. Modification en ligne des ventes / de l'assortiment, saisie des couples sans couverture, export CSV | `GET /stock_coverages`, `POST /stock_coverages` ; suggestions : `GET /items` (`pattern`), `GET /endpoints` |
+| **Mettre à jour** | Saisie manuelle (complétion OneStock sur l'article et le lieu de stock de chaque ligne) ou import CSV (`item_id;endpoint_id;sales_per_period;assortment`) ; ≤ 100 lignes : envoi direct, au-delà : import asynchrone par lots de 100, dont le statut est suivi sous l'envoi (`GET /stock_coverage_imports/{id}` toutes les 5 s). Réinitialisation des couvertures jusqu'à une date (avec confirmation) | `POST /stock_coverages`, `POST /stock_coverage_imports`, `POST /stock_coverage_imports/{id}/stock_coverages`, `PATCH /stock_coverage_imports/{id}`, `PATCH /reset_stock_coverages` |
+| **Paramètres** (accès discret) | Saisie du token OneStock et de la racine de l'API, lieux de stock par défaut, libellé de la période ; test de connexion. Le bouton, en haut à droite, reste invisible tant qu'il n'est pas survolé ou atteint au clavier | API Settings |
 
-Sans `onestock_token`, l'app s'ouvre directement sur l'onglet Paramètres.
+Sans `onestock_token`, l'app s'ouvre directement sur les Paramètres.
+
+Recherche sans paramètre : seules les listes renseignées sont envoyées à `GET /stock_coverages`. La spec OneStock
+marque `item_ids` et `endpoint_ids` comme obligatoires : si l'API refuse une recherche sans filtre, l'app l'indique.
 
 ## Architecture (Vercel)
 

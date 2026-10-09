@@ -3,7 +3,6 @@ import { computed, ref, watch } from 'vue';
 import { OsAlert, OsButton, OsTabs } from '#ds';
 import ConsultView from './views/ConsultView.vue';
 import UpdateView from './views/UpdateView.vue';
-import ImportsView from './views/ImportsView.vue';
 import SettingsView from './views/SettingsView.vue';
 import { useOnestockContext } from './composables/useOnestockContext';
 import { store, loadSettings, isConfigured } from './settings';
@@ -17,17 +16,10 @@ watch(() => context.lang, setLang, { immediate: true });
 const tabs = computed(() => [
   { id: 'consult', label: t('tab.consult') },
   { id: 'update', label: t('tab.update') },
-  { id: 'imports', label: t('tab.imports') },
-  { id: 'settings', label: t('tab.settings') },
 ]);
 const tab = ref('consult');
-const highlightImport = ref('');
 const configured = computed(() => store.loaded && isConfigured());
 
-function openImport(id: string) {
-  highlightImport.value = id;
-  tab.value = 'imports';
-}
 
 // In the back office the context arrives with the handshake, after the first render.
 watch(
@@ -50,7 +42,17 @@ watch(
   <main class="app">
     <header class="head">
       <h1 class="os-title-l title">{{ t('app.title') }}</h1>
-      <span v-if="context.siteId" class="os-body-s site">{{ t('app.site', { site: context.siteId }) }}</span>
+      <div class="head-right">
+        <span v-if="context.siteId" class="os-body-s site">{{ t('app.site', { site: context.siteId }) }}</span>
+        <!-- Hidden entry to the settings: invisible until hovered or focused (and shown while they are open). -->
+        <OsButton
+          class="settings-link"
+          :class="{ visible: tab === 'settings' }"
+          type="tertiary"
+          :text="t('tab.settings')"
+          @click="tab = 'settings'"
+        />
+      </div>
     </header>
     <OsTabs v-model="tab" :tabs="tabs" />
 
@@ -75,9 +77,8 @@ watch(
     <OsAlert v-if="store.error && tab !== 'settings'" type="danger" :title="t('settings.unreadable')" :subtitle="store.error" />
 
     <template v-if="context.ready">
-      <ConsultView v-show="tab === 'consult'" :context="context" @open-import="openImport" />
-      <UpdateView v-show="tab === 'update'" :context="context" @open-import="openImport" />
-      <ImportsView v-if="tab === 'imports'" :context="context" :highlight="highlightImport" />
+      <ConsultView v-show="tab === 'consult'" :context="context" />
+      <UpdateView v-show="tab === 'update'" :context="context" />
       <SettingsView v-if="tab === 'settings'" :context="context" />
     </template>
   </main>
@@ -87,5 +88,8 @@ watch(
 .app { padding: 16px; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .title { margin: 0; color: var(--os-neutral-700); }
+.head-right { display: flex; align-items: center; gap: 8px; }
 .site { color: var(--os-neutral-300); }
+.settings-link { opacity: 0; transition: opacity 0.2s; }
+.settings-link:hover, .settings-link:focus-visible, .settings-link.visible { opacity: 1; }
 </style>

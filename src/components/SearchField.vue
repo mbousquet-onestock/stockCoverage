@@ -17,7 +17,7 @@ const props = withDefaults(
     placeholder?: string;
     removeLabel?: string;
     suggest?: SuggestFn;
-    /** Characters to type before suggestions are asked for. */
+    /** Characters to type before suggestions are asked for (0: shown as soon as the field gets the focus). */
     minChars?: number;
     loadingText?: string;
     emptyText?: string;
@@ -52,6 +52,11 @@ function pick(suggestion: Suggestion) {
 }
 
 async function onEnter() {
+  // Empty field: Enter starts the search (even when the suggestions of the focus are shown).
+  if (!text.value.trim()) {
+    s.close();
+    return emit('search');
+  }
   const chosen = await s.settle(text.value);
   if (chosen) return pick(chosen);
   if (commit()) return;
@@ -110,6 +115,7 @@ defineExpose({ commit });
           @keydown.backspace="onBackspace"
           @input="onInput"
           @paste="onPaste"
+          @focus="minChars === 0 && s.lookup(text, 0)"
           @blur="onBlur"
         />
         <button type="button" class="icon" tabindex="-1" :aria-label="props.label" @click="onEnter">

@@ -1,6 +1,6 @@
 import { requestContext } from './settings';
 import type { OnestockContext } from './composables/useOnestockContext';
-import { chunk, itemName, matchEndpoints, READ_BATCH_SIZE, uploadPlan } from '#lib/coverage.js';
+import { coverageQueries, itemName, matchEndpoints, uploadPlan } from '#lib/coverage.js';
 
 export interface Coverage {
   item_id: string;
@@ -50,14 +50,11 @@ export function onestock<T>(context: OnestockContext, method: string, path: stri
   return post<T>('/api/onestock-proxy', context, { method, path, body });
 }
 
-/** GET /stock_coverages (both lists are required by OneStock), by batches of item ids. */
+/** GET /stock_coverages, by batches of item ids; an empty list is a search without that filter. */
 export async function readCoverages(context: OnestockContext, itemIds: string[], endpointIds: string[]) {
   const results = await Promise.all(
-    chunk(itemIds, READ_BATCH_SIZE).map((item_ids: string[]) =>
-      onestock<{ stock_coverages?: Coverage[] }>(context, 'GET', '/stock_coverages', {
-        item_ids,
-        endpoint_ids: endpointIds,
-      }),
+    coverageQueries(itemIds, endpointIds).map((body) =>
+      onestock<{ stock_coverages?: Coverage[] }>(context, 'GET', '/stock_coverages', body),
     ),
   );
   return results.flatMap((r) => r.stock_coverages || []);
@@ -105,14 +102,6 @@ export async function uploadCoverages(
   return { mode: 'async', importId };
 }
 
-export async function listImports(context: OnestockContext, { status = '', start = 0, limit = 20 } = {}) {
-  const data = await onestock<{ stock_coverage_imports?: CoverageImport[] }>(context, 'GET', '/stock_coverage_imports', {
-    ...(status ? { filter: { status } } : {}),
-    pagination: { start, limit },
-  });
-  return data.stock_coverage_imports || [];
-}
-
 export async function getImport(context: OnestockContext, id: string) {
   const data = await onestock<{ stock_coverage_import?: CoverageImport }>(
     context,
@@ -141,7 +130,8 @@ export async function searchItems(context: OnestockContext, pattern: string, lim
     context,
     'GET',
     '/items',
-    { pattern, features: ['name'], fields: ['product_id'], lang, pagination: { start: 0, limit } },
+    // Without text (field just focused): the first items of the catalogue.
+    { ...(pattern ? { pattern } : {}), features: ['name'], fields: ['product_id'], lang, pagination: { start: 0, limit } },
   );
   return (data.items || []).map((item) => ({
     id: item.id,

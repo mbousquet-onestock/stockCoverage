@@ -7,11 +7,12 @@ import { setting } from '../settings';
 import { endOfDayTimestamp, MAX_SYNC_COVERAGES, parseCoveragesCsv, uploadPlan } from '#lib/coverage.js';
 import { rowCoverage, rowOf, type EditableRow } from '../rows';
 import CoverageTable from '../components/CoverageTable.vue';
+import { useImportStatus } from '../composables/useImportStatus';
 import { errorText, t } from '../i18n';
 
 const props = defineProps<{ context: OnestockContext }>();
-const emit = defineEmits<{ openImport: [id: string] }>();
 
+const importStatus = useImportStatus(props.context);
 const rows = ref<EditableRow[]>([rowOf({ item_id: '', endpoint_id: '' })]);
 const csvText = ref('');
 const csvErrors = ref<{ line: number; code: string; value?: string }[]>([]);
@@ -57,6 +58,7 @@ function remove(row: EditableRow) {
 }
 
 function clearAll() {
+  importStatus.reset();
   rows.value = [rowOf({ item_id: '', endpoint_id: '' })];
   csvErrors.value = [];
   progress.value = null;
@@ -88,7 +90,7 @@ async function send() {
     const result = await uploadCoverages(props.context, coverages, (p) => (progress.value = p));
     if (result.mode === 'async') {
       success.value = t('update.sentAsync', { id: result.importId!, n: coverages.length });
-      emit('openImport', result.importId!);
+      importStatus.track(result.importId!);
     } else {
       success.value = t('update.sent', { n: coverages.length });
     }
@@ -183,6 +185,11 @@ async function reset() {
         />
         <OsAlert v-if="error" type="danger" :title="t('common.error')" :subtitle="error" />
         <OsAlert v-if="success" type="success" :subtitle="success" />
+    <OsAlert
+      v-if="importStatus.current.value"
+      :type="importStatus.done.value ? (importStatus.current.value.details?.invalid_stock_coverages ? 'warning' : 'success') : 'neutral'"
+      :subtitle="importStatus.error.value || importStatus.text.value"
+    />
         <div class="actions">
           <OsButton
             :text="t('update.send')"

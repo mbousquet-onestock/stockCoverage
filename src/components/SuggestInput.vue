@@ -26,6 +26,8 @@ function pick(suggestion: Suggestion) {
 }
 
 async function onEnter() {
+  // Empty cell: nothing to pick, unless a suggestion was chosen with the arrows.
+  if (!model.value && s.active.value < 0) return s.close();
   const chosen = await s.settle(model.value);
   if (chosen) pick(chosen);
   else s.close();
@@ -48,6 +50,7 @@ async function onEnter() {
       @keydown.down.prevent="s.move(1, model)"
       @keydown.up.prevent="s.move(-1, model)"
       @keydown.esc="s.close()"
+      @focus="minChars === 0 && s.lookup(model, 0)"
       @blur="s.close()"
     />
     <SuggestList
