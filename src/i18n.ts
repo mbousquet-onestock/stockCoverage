@@ -56,9 +56,9 @@ const fr = {
   'consult.withCoverage': 'Avec couverture',
   'consult.withoutCoverage': 'Sans couverture',
   'consult.searchHint':
-    'Filtres facultatifs : choisir parmi les suggestions OneStock, ou Entrée / virgule pour ajouter la valeur saisie (plusieurs possibles, collage accepté) ; Entrée sur un champ vide lance la recherche.',
+    'Article et lieu de stock obligatoires : choisir parmi les suggestions OneStock, ou Entrée / virgule pour ajouter la valeur saisie (plusieurs possibles, collage accepté) ; Entrée sur un champ vide lance la recherche.',
   'consult.search': 'Rechercher',
-  'consult.filterRequired': 'OneStock demande au moins un article et un lieu de stock pour cette recherche.',
+  'consult.filterRequired': 'Au moins un article et un lieu de stock sont nécessaires pour rechercher.',
   'consult.results': 'Résultats',
   'consult.found': '{n} couverture(s) trouvée(s)',
   'consult.missing': '{n} couple(s) sans couverture',
@@ -195,9 +195,9 @@ const en: Record<Key, string> = {
   'consult.withCoverage': 'With coverage',
   'consult.withoutCoverage': 'Without coverage',
   'consult.searchHint':
-    'Optional filters: pick among the OneStock suggestions, or Enter / comma to add the typed value (several allowed, paste accepted); Enter on an empty field starts the search.',
+    'Item and stock location required: pick among the OneStock suggestions, or Enter / comma to add the typed value (several allowed, paste accepted); Enter on an empty field starts the search.',
   'consult.search': 'Search',
-  'consult.filterRequired': 'OneStock needs at least one item and one stock location for this search.',
+  'consult.filterRequired': 'At least one item and one stock location are needed to search.',
   'consult.results': 'Results',
   'consult.found': '{n} coverage(s) found',
   'consult.missing': '{n} pair(s) without coverage',

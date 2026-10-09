@@ -50,7 +50,7 @@ export function onestock<T>(context: OnestockContext, method: string, path: stri
   return post<T>('/api/onestock-proxy', context, { method, path, body });
 }
 
-/** GET /stock_coverages, by batches of item ids; an empty list is a search without that filter. */
+/** GET /stock_coverages (both lists are required by OneStock), by batches of item ids. */
 export async function readCoverages(context: OnestockContext, itemIds: string[], endpointIds: string[]) {
   const results = await Promise.all(
     coverageQueries(itemIds, endpointIds).map((body) =>

@@ -71,6 +71,11 @@ async function search() {
   itemField.value?.commit();
   endpointField.value?.commit();
   if (loading.value) return;
+  // OneStock requires at least one item and one stock location.
+  if (!itemIds.value.length || !endpointIds.value.length) {
+    error.value = t('consult.filterRequired');
+    return;
+  }
   error.value = '';
   success.value = '';
   loading.value = true;
@@ -79,25 +84,18 @@ async function search() {
     show(coverages);
     searched.value = { items: itemIds.value.length, endpoints: endpointIds.value.length };
   } catch (err) {
-    const message = (err as Error).message;
-    const status = (err as { status?: number }).status;
-    // The API documents both lists as required: say so when a search without filter is refused.
-    const unfiltered = !itemIds.value.length || !endpointIds.value.length;
-    error.value = unfiltered && status === 400 ? `${message} — ${t('consult.filterRequired')}` : message;
+    error.value = (err as Error).message;
   } finally {
     loading.value = false;
   }
 }
 
-/**
- * Found coverages first, then the pairs asked for that have none (to be filled in): only when both items and
- * stock locations were given, a search without one of them only lists what exists.
- */
+/** Found coverages first, then the pairs asked for that have none (to be filled in). */
 function show(coverages: Coverage[]) {
   const unique = new Map(coverages.map((c) => [coverageKey(c), c]));
   rows.value = [
     ...[...unique.values()].map((c) => rowOf(c, c)),
-    ...missingPairs(itemIds.value, itemIds.value.length ? endpointIds.value : [], [...unique.values()]).map((pair: Pick<Coverage, 'item_id' | 'endpoint_id'>) => rowOf(pair)),
+    ...missingPairs(itemIds.value, endpointIds.value, [...unique.values()]).map((pair: Pick<Coverage, 'item_id' | 'endpoint_id'>) => rowOf(pair)),
   ];
 }
 
@@ -174,6 +172,7 @@ function exportCsv() {
           type="secondary"
           :text="t('consult.search')"
           :pending="loading"
+          :disabled="!itemIds.length || !endpointIds.length"
           @click="search"
         />
       </div>
