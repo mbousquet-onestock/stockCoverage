@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { OsAlert, OsBadge, OsButton, OsCardLayout, OsSelect } from '#ds';
 import type { OnestockContext } from '../composables/useOnestockContext';
 import { formatDate, getImport, listImports, type CoverageImport, type ImportStatus } from '../api';
+import { t, type MessageKey } from '../i18n';
 
 const props = defineProps<{ context: OnestockContext; highlight?: string }>();
 
@@ -13,23 +14,21 @@ const start = ref(0);
 const loading = ref(false);
 const error = ref('');
 
-const statusOptions = [
-  { id: '', primaryText: 'Tous les statuts' },
-  { id: 'open', primaryText: 'Ouvert' },
-  { id: 'closed', primaryText: 'Fermé (en traitement)' },
-  { id: 'completed', primaryText: 'Terminé' },
-  { id: 'timed_out', primaryText: 'Expiré' },
-];
-
-const BADGES: Record<ImportStatus, { text: string; color: 'blue' | 'orange' | 'green' | 'red' }> = {
-  open: { text: 'Ouvert', color: 'blue' },
-  closed: { text: 'En traitement', color: 'orange' },
-  completed: { text: 'Terminé', color: 'green' },
-  timed_out: { text: 'Expiré', color: 'red' },
+const STATUS_COLORS: Record<ImportStatus, 'blue' | 'orange' | 'green' | 'red'> = {
+  open: 'blue',
+  closed: 'orange',
+  completed: 'green',
+  timed_out: 'red',
 };
 
+const statusOptions = computed(() => [
+  { id: '', primaryText: t('imports.allStatuses') },
+  ...Object.keys(STATUS_COLORS).map((id) => ({ id, primaryText: t(`imports.status.${id}` as MessageKey) })),
+]);
+
 function badge(item: CoverageImport) {
-  return BADGES[item.status] ?? { text: item.status, color: 'blue' as const };
+  if (!(item.status in STATUS_COLORS)) return { text: item.status, color: 'blue' as const };
+  return { text: t(`imports.status.${item.status}` as MessageKey), color: STATUS_COLORS[item.status] };
 }
 
 async function load() {
@@ -86,28 +85,28 @@ load();
     <OsCardLayout>
       <div class="group">
         <div class="head">
-          <div class="os-label-l">Imports asynchrones de couvertures</div>
+          <div class="os-label-l">{{ t('imports.title') }}</div>
           <div class="filters">
             <OsSelect v-model="status" :options="statusOptions" />
-            <OsButton type="secondary" text="Actualiser" :pending="loading" @click="load" />
+            <OsButton type="secondary" :text="t('common.refresh')" :pending="loading" @click="load" />
           </div>
         </div>
 
-        <OsAlert v-if="error" type="danger" title="Erreur" :subtitle="error" />
-        <OsAlert v-else-if="!loading && !imports.length" type="info" subtitle="Aucun import trouvé." />
+        <OsAlert v-if="error" type="danger" :title="t('common.error')" :subtitle="error" />
+        <OsAlert v-else-if="!loading && !imports.length" type="info" :subtitle="t('imports.none')" />
 
         <div v-if="imports.length" class="table-wrap">
           <table class="imports os-label-s">
             <thead>
               <tr class="os-body-m">
-                <th>Import</th>
-                <th>Statut</th>
-                <th>Créé le</th>
-                <th>Terminé le</th>
-                <th class="num">Lots reçus / traités</th>
-                <th class="num">Lignes reçues</th>
-                <th class="num">Importées</th>
-                <th class="num">En erreur</th>
+                <th>{{ t('imports.id') }}</th>
+                <th>{{ t('imports.status') }}</th>
+                <th>{{ t('imports.created') }}</th>
+                <th>{{ t('imports.completed') }}</th>
+                <th class="num">{{ t('imports.batches') }}</th>
+                <th class="num">{{ t('imports.received') }}</th>
+                <th class="num">{{ t('imports.imported') }}</th>
+                <th class="num">{{ t('imports.invalid') }}</th>
                 <th />
               </tr>
             </thead>
@@ -126,7 +125,7 @@ load();
                 <td class="num" :class="{ bad: (item.details?.invalid_stock_coverages ?? 0) > 0 }">
                   {{ item.details?.invalid_stock_coverages ?? '–' }}
                 </td>
-                <td><OsButton type="tertiary" text="Actualiser" @click="refresh(item)" /></td>
+                <td><OsButton type="tertiary" :text="t('common.refresh')" @click="refresh(item)" /></td>
               </tr>
             </tbody>
           </table>
@@ -135,13 +134,13 @@ load();
         <div class="pager">
           <OsButton
             type="tertiary"
-            text="← Précédents"
+            :text="t('imports.previous')"
             :disabled="start === 0 || loading"
             @click="start = Math.max(0, start - PAGE_SIZE); load()"
           />
           <OsButton
             type="tertiary"
-            text="Suivants →"
+            :text="t('imports.next')"
             :disabled="imports.length < PAGE_SIZE || loading"
             @click="start += PAGE_SIZE; load()"
           />

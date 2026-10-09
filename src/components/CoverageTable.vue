@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { OsBadge, OsButton } from '#ds';
 import { isDirty, rowCoverage, type EditableRow } from '../rows';
+import { errorText, t } from '../i18n';
 
 const props = withDefaults(
   defineProps<{
@@ -11,7 +12,7 @@ const props = withDefaults(
     removable?: boolean;
     periodLabel?: string;
   }>(),
-  { editableIds: false, removable: false, periodLabel: 'période' },
+  { editableIds: false, removable: false, periodLabel: '' },
 );
 const emit = defineEmits<{ remove: [row: EditableRow] }>();
 
@@ -22,9 +23,9 @@ const visible = computed(() => props.rows.slice(0, shown.value));
 function status(row: EditableRow): { text: string; color: 'red' | 'orange' | 'grey' | 'green' | 'blue' } | null {
   const { error } = rowCoverage(row);
   const typed = Boolean(row.sales.trim() || (props.editableIds && (row.item_id || row.endpoint_id)));
-  if (error && typed) return { text: error, color: 'red' };
-  if (!row.original) return row.sales.trim() ? { text: 'Nouvelle', color: 'blue' } : { text: 'Absente', color: 'grey' };
-  if (isDirty(row)) return { text: 'Modifiée', color: 'orange' };
+  if (error && typed) return { text: errorText(error), color: 'red' };
+  if (!row.original) return row.sales.trim() ? { text: t('table.new'), color: 'blue' } : { text: t('table.missing'), color: 'grey' };
+  if (isDirty(row)) return { text: t('table.changed'), color: 'orange' };
   return null;
 }
 </script>
@@ -34,11 +35,11 @@ function status(row: EditableRow): { text: string; color: 'red' | 'orange' | 'gr
     <table class="coverage-table os-label-s">
       <thead>
         <tr class="os-body-m">
-          <th>Article (item_id)</th>
-          <th>Lieu de stock (endpoint_id)</th>
-          <th class="num">Ventes / {{ periodLabel }}</th>
-          <th class="center">Assortiment</th>
-          <th>État</th>
+          <th>{{ t('table.item') }}</th>
+          <th>{{ t('table.endpoint') }}</th>
+          <th class="num">{{ t('table.sales', { period: periodLabel || t('common.period') }) }}</th>
+          <th class="center">{{ t('table.assortment') }}</th>
+          <th>{{ t('table.status') }}</th>
           <th v-if="removable" />
         </tr>
       </thead>
@@ -68,14 +69,14 @@ function status(row: EditableRow): { text: string; color: 'red' | 'orange' | 'gr
             <OsBadge v-if="status(row)" type="secondary" :text="status(row)!.text" :color="status(row)!.color" />
           </td>
           <td v-if="removable" class="center">
-            <OsButton type="tertiary" color="red" text="Retirer" @click="emit('remove', row)" />
+            <OsButton type="tertiary" color="red" :text="t('table.remove')" @click="emit('remove', row)" />
           </td>
         </tr>
       </tbody>
     </table>
     <div v-if="rows.length > shown" class="more">
-      <span class="os-body-s hint">{{ shown }} lignes affichées sur {{ rows.length }}</span>
-      <OsButton type="tertiary" text="Afficher plus" @click="shown += PAGE" />
+      <span class="os-body-s hint">{{ t('table.shown', { shown, total: rows.length }) }}</span>
+      <OsButton type="tertiary" :text="t('table.more')" @click="shown += PAGE" />
     </div>
   </div>
 </template>

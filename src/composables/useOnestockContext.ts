@@ -66,6 +66,7 @@ export function useOnestockContext() {
     context.siteId = data.site_id || context.siteId;
     context.userId = data.user_id || context.userId;
     context.extensionId = data.extension_id || context.extensionId;
+    context.lang = data.lang || context.lang;
     const itemIds = idsOf(data.item_id, data.item_ids);
     const endpointIds = idsOf(data.endpoint_id, data.endpoint_ids);
     if (itemIds.length) context.itemIds = itemIds;

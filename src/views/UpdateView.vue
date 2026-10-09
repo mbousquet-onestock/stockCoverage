@@ -7,19 +7,20 @@ import { setting } from '../settings';
 import { endOfDayTimestamp, MAX_SYNC_COVERAGES, parseCoveragesCsv, uploadPlan } from '#lib/coverage.js';
 import { rowCoverage, rowOf, type EditableRow } from '../rows';
 import CoverageTable from '../components/CoverageTable.vue';
+import { errorText, t } from '../i18n';
 
 const props = defineProps<{ context: OnestockContext }>();
 const emit = defineEmits<{ openImport: [id: string] }>();
 
 const rows = ref<EditableRow[]>([rowOf({ item_id: '', endpoint_id: '' })]);
 const csvText = ref('');
-const csvErrors = ref<{ line: number; message: string }[]>([]);
+const csvErrors = ref<{ line: number; code: string; value?: string }[]>([]);
 const sending = ref(false);
 const progress = ref<UploadProgress | null>(null);
 const error = ref('');
 const success = ref('');
 
-const periodLabel = computed(() => setting('period_label') || 'période');
+const periodLabel = computed(() => setting('period_label'));
 /** Lines left completely empty are ignored. */
 const filled = computed(() => rows.value.filter((r) => r.item_id || r.endpoint_id || r.sales.trim()));
 const invalid = computed(() => filled.value.filter((r) => rowCoverage(r).error));
@@ -28,8 +29,19 @@ const planText = computed(() => {
   const n = filled.value.length;
   if (!n) return '';
   return plan.value.mode === 'sync'
-    ? `${n} ligne(s) : envoi direct (POST /stock_coverages).`
-    : `${n} lignes (plus de ${MAX_SYNC_COVERAGES}) : import asynchrone en ${plan.value.batches.length} lot(s).`;
+    ? t('update.planSync', { n })
+    : t('update.planAsync', { n, max: MAX_SYNC_COVERAGES, batches: plan.value.batches.length });
+});
+const csvErrorText = computed(() => {
+  const shown = csvErrors.value.slice(0, 10).map((e) => t('update.csvLine', { line: e.line, message: errorText(e) }));
+  return shown.join(' · ') + (csvErrors.value.length > 10 ? ' …' : '');
+});
+const progressText = computed(() => {
+  const p = progress.value;
+  if (!p) return '';
+  return p.importId
+    ? t('update.progressImport', { sent: p.sent, total: p.total, id: p.importId })
+    : t('update.progress', { sent: p.sent, total: p.total });
 });
 
 function addRow() {
@@ -73,10 +85,10 @@ async function send() {
     const coverages = filled.value.map((r) => rowCoverage(r).coverage!);
     const result = await uploadCoverages(props.context, coverages, (p) => (progress.value = p));
     if (result.mode === 'async') {
-      success.value = `Import ${result.importId} créé et fermé : ${coverages.length} ligne(s) en cours de traitement par OneStock.`;
+      success.value = t('update.sentAsync', { id: result.importId!, n: coverages.length });
       emit('openImport', result.importId!);
     } else {
-      success.value = `${coverages.length} couverture(s) enregistrée(s).`;
+      success.value = t('update.sent', { n: coverages.length });
     }
   } catch (err) {
     error.value = (err as Error).message;
@@ -98,7 +110,7 @@ async function reset() {
   resetMessage.value = null;
   try {
     await resetCoverages(props.context, resetBefore.value);
-    resetMessage.value = { type: 'success', text: `Couvertures créées jusqu'au ${resetDate.value} inclus supprimées.` };
+    resetMessage.value = { type: 'success', text: t('update.resetDone', { date: resetDate.value }) };
     resetConfirmed.value = false;
   } catch (err) {
     resetMessage.value = { type: 'danger', text: (err as Error).message };
@@ -112,13 +124,10 @@ async function reset() {
   <section class="view">
     <OsCardLayout>
       <div class="group">
-        <div class="os-label-l">Importer un fichier CSV</div>
-        <span class="os-body-s hint">
-          Colonnes <code>item_id;endpoint_id;sales_per_period;assortment</code> (séparateur « ; », « , » ou tabulation,
-          ligne d'en-tête facultative, assortment vide = true). Le fichier remplace les lignes ci-dessous.
-        </span>
+        <div class="os-label-l">{{ t('update.csvTitle') }}</div>
+        <span class="os-body-s hint">{{ t('update.csvHint') }}</span>
         <label class="textarea">
-          <span class="os-body-m">Contenu CSV</span>
+          <span class="os-body-m">{{ t('update.csvContent') }}</span>
           <textarea
             v-model="csvText"
             class="os-label-s mono"
@@ -128,16 +137,16 @@ async function reset() {
         </label>
         <div class="actions">
           <label class="file os-body-l">
-            Choisir un fichier…
+            {{ t('update.chooseFile') }}
             <input type="file" accept=".csv,.txt,text/csv,text/plain" @change="onFile" />
           </label>
-          <OsButton type="secondary" text="Charger le CSV" :disabled="!csvText.trim()" @click="loadCsv" />
+          <OsButton type="secondary" :text="t('update.loadCsv')" :disabled="!csvText.trim()" @click="loadCsv" />
         </div>
         <OsAlert
           v-if="csvErrors.length"
           type="warning"
-          :title="`${csvErrors.length} ligne(s) ignorée(s)`"
-          :subtitle="csvErrors.slice(0, 10).map((e) => `Ligne ${e.line} : ${e.message}`).join(' · ') + (csvErrors.length > 10 ? ' …' : '')"
+          :title="t('update.csvErrors', { n: csvErrors.length })"
+          :subtitle="csvErrorText"
         />
       </div>
     </OsCardLayout>
@@ -145,30 +154,28 @@ async function reset() {
     <OsCardLayout>
       <div class="group">
         <div class="head">
-          <div class="os-label-l">Couvertures à envoyer</div>
-          <OsBadge v-if="filled.length" :text="`${filled.length} ligne(s)`" color="blue" />
+          <div class="os-label-l">{{ t('update.title') }}</div>
+          <OsBadge v-if="filled.length" :text="t('update.lines', { n: filled.length })" color="blue" />
         </div>
-        <span class="os-body-s hint">
-          Une ligne existante dans OneStock (même article et même lieu de stock) est remplacée.
-        </span>
+        <span class="os-body-s hint">{{ t('update.hint') }}</span>
         <CoverageTable :rows="rows" editable-ids removable :period-label="periodLabel" @remove="remove" />
         <div class="actions">
-          <OsButton class="left" type="tertiary" text="+ Ajouter une ligne" @click="addRow" />
-          <OsButton type="tertiary" text="Tout effacer" @click="clearAll" />
+          <OsButton class="left" type="tertiary" :text="t('update.addRow')" @click="addRow" />
+          <OsButton type="tertiary" :text="t('update.clear')" @click="clearAll" />
         </div>
 
-        <OsAlert v-if="invalid.length" type="warning" :subtitle="`${invalid.length} ligne(s) invalide(s) à corriger.`" />
+        <OsAlert v-if="invalid.length" type="warning" :subtitle="t('update.invalid', { n: invalid.length })" />
         <span v-if="planText" class="os-body-s hint">{{ planText }}</span>
         <OsAlert
           v-if="sending && progress"
           type="neutral"
-          :subtitle="`Envoi : ${progress.sent} / ${progress.total} ligne(s)${progress.importId ? ` — import ${progress.importId}` : ''}`"
+          :subtitle="progressText"
         />
-        <OsAlert v-if="error" type="danger" title="Erreur" :subtitle="error" />
+        <OsAlert v-if="error" type="danger" :title="t('common.error')" :subtitle="error" />
         <OsAlert v-if="success" type="success" :subtitle="success" />
         <div class="actions">
           <OsButton
-            text="Envoyer à OneStock"
+            :text="t('update.send')"
             :pending="sending"
             :disabled="!filled.length || invalid.length > 0"
             @click="send"
@@ -179,25 +186,22 @@ async function reset() {
 
     <OsCardLayout>
       <div class="group">
-        <div class="os-label-l">Réinitialiser les couvertures</div>
-        <span class="os-body-s hint">
-          Supprime toutes les couvertures du site créées jusqu'à la date choisie incluse (PATCH /reset_stock_coverages).
-          Opération irréversible.
-        </span>
+        <div class="os-label-l">{{ t('update.resetTitle') }}</div>
+        <span class="os-body-s hint">{{ t('update.resetHint') }}</span>
         <div class="row">
-          <OsInputText v-model="resetDate" type="date" label="Créées jusqu'au" />
+          <OsInputText v-model="resetDate" type="date" :label="t('update.resetDate')" />
         </div>
         <OsCheckbox
           v-model="resetConfirmed"
           :disabled="!resetBefore"
-          :label="`Je confirme la suppression des couvertures du site ${context.siteId || ''}`"
+          :label="t('update.resetConfirm', { site: context.siteId || '' })"
         />
         <OsAlert v-if="resetMessage" :type="resetMessage.type" :subtitle="resetMessage.text" />
         <OsDivider />
         <div class="actions">
           <OsButton
             color="red"
-            text="Supprimer"
+            :text="t('update.resetButton')"
             :pending="resetting"
             :disabled="!resetBefore || !resetConfirmed"
             @click="reset"

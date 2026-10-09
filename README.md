@@ -8,6 +8,10 @@ Elle récupère le contexte OneStock (paramètres d'URL + handshake `extension_r
 `site_id`, `api_url`, `extension_id`, et le cas échéant `item_id(s)` / `endpoint_id(s)` pour pré-remplir la
 recherche. Conformément à la demande, **la signature de l'extension n'est pas vérifiée** (pas de sécurité).
 
+Les textes statiques suivent la langue du contexte (`lang`, paramètre d'URL ou `onestock_data`) : français et
+anglais dans `src/i18n.ts`, repli sur l'anglais pour les autres langues (ajouter un dictionnaire pour en gérer une
+nouvelle). Les messages d'erreur renvoyés par les API (OneStock, Settings) sont affichés tels quels.
+
 ## Onglets
 
 | Onglet | Rôle | API OneStock |
@@ -51,7 +55,7 @@ le token déchiffré n'atteignent jamais le navigateur. Un setting est identifi�
 | `onestock_token` 🔒 | site, `*` | Token de l'API OneStock : lu au niveau global s'il y est fourni, sinon **saisi dans l'onglet Paramètres** (chiffré par l'API Settings ; laisser vide conserve la valeur) |
 | `onestock_api_root` | site, `*` | Racine de l'API OneStock (sinon URL du contexte) |
 | `default_endpoint_ids` | site, extension | Lieux de stock pré-remplis dans la recherche |
-| `period_label` | site, extension | Libellé de la période des ventes (affichage, défaut `semaine`) |
+| `period_label` | site, extension | Libellé de la période des ventes (affichage ; vide = « période » traduit dans la langue du contexte) |
 
 À la première connexion, les clés non secrètes absentes sont créées avec leur valeur par défaut.
 

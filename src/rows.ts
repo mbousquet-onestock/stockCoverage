@@ -25,7 +25,7 @@ export function rowOf(coverage: Partial<Coverage> & { item_id: string; endpoint_
   };
 }
 
-export function rowCoverage(row: EditableRow): { coverage?: Coverage; error?: string } {
+export function rowCoverage(row: EditableRow): { coverage?: Coverage; error?: { code: string; value?: string } } {
   return normalizeCoverage({
     item_id: row.item_id,
     endpoint_id: row.endpoint_id,

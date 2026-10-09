@@ -7,6 +7,7 @@ import { setting } from '../settings';
 import { coverageKey, coveragesToCsv, missingPairs, parseIds } from '#lib/coverage.js';
 import { isDirty, rowCoverage, rowOf, type EditableRow } from '../rows';
 import { downloadText } from '../download';
+import { t } from '../i18n';
 import CoverageTable from '../components/CoverageTable.vue';
 
 const props = defineProps<{ context: OnestockContext }>();
@@ -82,10 +83,10 @@ async function save() {
     const coverages = changed.value.map((r) => rowCoverage(r).coverage!);
     const result = await uploadCoverages(props.context, coverages);
     if (result.mode === 'async') {
-      success.value = `${coverages.length} couverture(s) envoyée(s) en import asynchrone (${result.importId}).`;
+      success.value = t('consult.savedAsync', { n: coverages.length, id: result.importId! });
       emit('openImport', result.importId!);
     } else {
-      success.value = `${coverages.length} couverture(s) mise(s) à jour.`;
+      success.value = t('consult.saved', { n: coverages.length });
       // OneStock applies the coverages it accepted: they become the reference values.
       for (const row of changed.value) row.original = rowCoverage(row).coverage!;
     }
@@ -106,22 +107,22 @@ function exportCsv() {
   <section class="view">
     <OsCardLayout>
       <div class="group">
-        <div class="os-label-l">Rechercher des couvertures</div>
+        <div class="os-label-l">{{ t('consult.title') }}</div>
         <div class="row">
           <label class="textarea">
-            <span class="os-body-m">Articles (item_id)</span>
-            <textarea v-model="itemsText" class="os-label-s" rows="5" placeholder="Un identifiant par ligne, ou séparés par des virgules" />
-            <span class="os-body-s hint">{{ itemIds.length }} article(s)</span>
+            <span class="os-body-m">{{ t('consult.items') }}</span>
+            <textarea v-model="itemsText" class="os-label-s" rows="5" :placeholder="t('consult.itemsPlaceholder')" />
+            <span class="os-body-s hint">{{ t('consult.itemsCount', { n: itemIds.length }) }}</span>
           </label>
           <label class="textarea">
-            <span class="os-body-m">Lieux de stock (endpoint_id)</span>
+            <span class="os-body-m">{{ t('consult.endpoints') }}</span>
             <textarea v-model="endpointsText" class="os-label-s" rows="5" placeholder="store_1, warehouse_2…" />
-            <span class="os-body-s hint">{{ endpointIds.length }} lieu(x) de stock</span>
+            <span class="os-body-s hint">{{ t('consult.endpointsCount', { n: endpointIds.length }) }}</span>
           </label>
         </div>
         <div class="actions">
           <OsButton
-            text="Rechercher"
+            :text="t('consult.search')"
             :pending="loading"
             :disabled="!itemIds.length || !endpointIds.length"
             @click="search"
@@ -130,39 +131,35 @@ function exportCsv() {
       </div>
     </OsCardLayout>
 
-    <OsAlert v-if="error" type="danger" title="Erreur" :subtitle="error" />
+    <OsAlert v-if="error" type="danger" :title="t('common.error')" :subtitle="error" />
     <OsAlert v-if="success" type="success" :subtitle="success" />
 
     <OsCardLayout v-if="searched">
       <div class="group">
         <div class="head">
-          <div class="os-label-l">Résultats</div>
+          <div class="os-label-l">{{ t('consult.results') }}</div>
           <div class="badges">
-            <OsBadge :text="`${found} couverture(s) trouvée(s)`" color="green" />
+            <OsBadge :text="t('consult.found', { n: found })" color="green" />
             <OsBadge
               v-if="rows.length - found"
-              :text="`${rows.length - found} couple(s) sans couverture`"
+              :text="t('consult.missing', { n: rows.length - found })"
               color="grey"
             />
           </div>
         </div>
-        <span class="os-body-s hint">
-          Modifier les ventes par {{ setting('period_label') || 'période' }} ou l'assortiment puis enregistrer. Les couples
-          sans couverture peuvent être renseignés directement. Un article hors assortiment est compté avec 1 vente par
-          période.
-        </span>
-        <OsCheckbox v-model="hideMissing" label="Masquer les couples sans couverture" />
-        <CoverageTable :rows="shownRows" :period-label="setting('period_label') || 'période'" />
+        <span class="os-body-s hint">{{ t('consult.hint', { period: setting('period_label') || t('common.period') }) }}</span>
+        <OsCheckbox v-model="hideMissing" :label="t('consult.hideMissing')" />
+        <CoverageTable :rows="shownRows" :period-label="setting('period_label')" />
         <OsAlert
           v-if="invalid.length"
           type="warning"
-          :subtitle="`${invalid.length} ligne(s) modifiée(s) invalide(s) : corriger avant d'enregistrer.`"
+          :subtitle="t('consult.invalid', { n: invalid.length })"
         />
         <div class="actions">
-          <OsButton class="left" type="tertiary" text="Exporter en CSV" :disabled="!found" @click="exportCsv" />
-          <OsButton type="secondary" text="Annuler les modifications" :disabled="!changed.length" @click="cancel" />
+          <OsButton class="left" type="tertiary" :text="t('consult.export')" :disabled="!found" @click="exportCsv" />
+          <OsButton type="secondary" :text="t('consult.cancel')" :disabled="!changed.length" @click="cancel" />
           <OsButton
-            :text="changed.length ? `Enregistrer ${changed.length} modification(s)` : 'Enregistrer'"
+            :text="changed.length ? t('consult.saveN', { n: changed.length }) : t('common.save')"
             :pending="saving"
             :disabled="!changed.length || invalid.length > 0"
             @click="save"
