@@ -6,6 +6,7 @@ import { reactive } from 'vue';
  * Placeholders: `{name}`.
  */
 const fr = {
+  'app.title': 'Couverture de stock',
   'tab.consult': 'Consulter',
   'tab.update': 'Mettre à jour',
   'tab.settings': 'Paramètres',
@@ -143,6 +144,7 @@ const fr = {
 type Key = keyof typeof fr;
 
 const en: Record<Key, string> = {
+  'app.title': 'Stock coverage',
   'tab.consult': 'View',
   'tab.update': 'Update',
   'tab.settings': 'Settings',
