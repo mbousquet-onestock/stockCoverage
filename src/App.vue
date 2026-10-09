@@ -41,7 +41,6 @@ watch(
 <template>
   <header class="banner">
     <div class="banner-inner">
-      <h1 class="title">{{ t('app.title') }}</h1>
       <nav class="tabs" role="tablist">
         <button
           v-for="item in tabs"
@@ -106,10 +105,9 @@ watch(
 </template>
 
 <style scoped>
-/* Navy banner of the OneStock apps: title, then tabs underlined in white when active. */
+/* Navy banner of the OneStock apps: tabs underlined in white when active. */
 .banner { background: #18244a; font-family: Roboto, sans-serif; }
-.banner-inner { max-width: 1100px; margin: 0 auto; padding: 12px 16px 0; }
-.title { margin: 0 0 14px; color: #fff; font-size: 1.25rem; font-weight: 500; line-height: 1.4; }
+.banner-inner { max-width: 1100px; margin: 0 auto; padding: 8px 16px 0; }
 .tabs { display: flex; flex-wrap: wrap; gap: 4px; }
 .tab {
   display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 14px;
