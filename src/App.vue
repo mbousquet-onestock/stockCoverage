@@ -97,13 +97,8 @@ watch(
 </template>
 
 <style scoped>
-/* Blue banner of the OneStock design system (navy, fine diamond pattern), holding the tabs. */
-.banner {
-  background-color: #1b2152;
-  background-image:
-    repeating-linear-gradient(45deg, rgba(64, 96, 255, 0.28) 0 1px, transparent 1px 12px),
-    repeating-linear-gradient(-45deg, rgba(64, 96, 255, 0.28) 0 1px, transparent 1px 12px);
-}
+/* Plain navy banner of the OneStock design system, holding the tabs. */
+.banner { background: #18244a; }
 .banner-inner {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   max-width: 1100px; margin: 0 auto; padding: 8px 16px;
