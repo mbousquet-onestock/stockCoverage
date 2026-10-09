@@ -58,7 +58,7 @@ le token déchiffré n'atteignent jamais le navigateur. Un setting est identifi�
 
 | Clé | Niveau d'écriture | Rôle |
 | --- | --- | --- |
-| `onestock_token` 🔒 | site, `*` | Token de l'API OneStock : lu au niveau global s'il y est fourni, sinon **saisi dans l'onglet Paramètres** (chiffré par l'API Settings ; laisser vide conserve la valeur) |
+| `onestock_token` 🔒 | site, `*` | Token de l'API OneStock : lu au niveau global s'il y est fourni, sinon **saisi dans les Paramètres** (chiffré par l'API Settings ; laisser vide conserve la valeur) |
 | `onestock_api_root` | site, `*` | Racine de l'API OneStock (sinon URL du contexte) |
 | `default_endpoint_ids` | site, extension | Lieux de stock pré-remplis dans la recherche |
 | `period_label` | site, extension | Libellé de la période des ventes (affichage ; vide = « période » traduit dans la langue du contexte) |

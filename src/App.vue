@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { OsAlert, OsButton, OsTabs } from '#ds';
+import { OsAlert, OsButton } from '#ds';
 import ConsultView from './views/ConsultView.vue';
 import UpdateView from './views/UpdateView.vue';
 import SettingsView from './views/SettingsView.vue';
@@ -39,18 +39,34 @@ watch(
 </script>
 
 <template>
-  <main class="app">
-    <header class="head">
-      <OsTabs v-model="tab" :tabs="tabs" />
+  <header class="banner">
+    <nav class="banner-inner">
+      <div class="tabs" role="tablist">
+        <button
+          v-for="item in tabs"
+          :key="item.id"
+          type="button"
+          role="tab"
+          class="tab os-body-l"
+          :class="{ active: item.id === tab }"
+          :aria-selected="item.id === tab"
+          @click="tab = item.id"
+        >
+          {{ item.label }}
+        </button>
+      </div>
       <!-- Hidden entry to the settings: invisible until hovered or focused (and shown while they are open). -->
-      <OsButton
-        class="settings-link"
-        :class="{ visible: tab === 'settings' }"
-        type="tertiary"
-        :text="t('tab.settings')"
+      <button
+        type="button"
+        class="tab settings-link os-body-l"
+        :class="{ active: tab === 'settings', visible: tab === 'settings' }"
         @click="tab = 'settings'"
-      />
-    </header>
+      >
+        {{ t('tab.settings') }}
+      </button>
+    </nav>
+  </header>
+  <main class="app">
 
     <OsAlert v-if="!context.ready" type="neutral" :subtitle="t('context.loading')" />
     <OsAlert v-else-if="!context.siteId" type="warning" :title="t('context.noSite')" />
@@ -81,8 +97,27 @@ watch(
 </template>
 
 <style scoped>
-.app { padding: 16px; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
-.head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* Blue banner of the OneStock design system (navy, fine diamond pattern), holding the tabs. */
+.banner {
+  background-color: #1b2152;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(64, 96, 255, 0.28) 0 1px, transparent 1px 12px),
+    repeating-linear-gradient(-45deg, rgba(64, 96, 255, 0.28) 0 1px, transparent 1px 12px);
+}
+.banner-inner {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  max-width: 1100px; margin: 0 auto; padding: 8px 16px;
+}
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab {
+  display: flex; align-items: center; justify-content: center; min-height: 36px; padding: 8px 16px;
+  border: none; border-radius: var(--os-radius); background: transparent; color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+.tab:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.tab.active { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.tab:focus-visible { outline: 2px solid var(--os-primary-1000); outline-offset: 1px; }
 .settings-link { opacity: 0; transition: opacity 0.2s; }
 .settings-link:hover, .settings-link:focus-visible, .settings-link.visible { opacity: 1; }
+.app { padding: 16px; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 </style>
