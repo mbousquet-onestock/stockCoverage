@@ -6,15 +6,13 @@ import { reactive } from 'vue';
  * Placeholders: `{name}`.
  */
 const fr = {
-  'app.title': 'Couverture de stock',
-  'app.site': 'Site {site}',
   'tab.consult': 'Consulter',
   'tab.update': 'Mettre à jour',
   'tab.settings': 'Paramètres',
   'context.loading': 'Chargement du contexte OneStock…',
   'context.noSite': 'Site ID manquant dans le contexte',
   'token.missingTitle': 'onestock_token introuvable',
-  'token.missingText': "Saisir le token de l'API OneStock dans l'onglet Paramètres.",
+  'token.missingText': "Saisir le token de l'API OneStock dans les Paramètres.",
   'settings.created': 'Première connexion : paramètres initialisés',
   'settings.createdText': 'Créés avec leur valeur par défaut : {keys}',
   'settings.unreadable': 'Paramètres illisibles',
@@ -145,15 +143,13 @@ const fr = {
 type Key = keyof typeof fr;
 
 const en: Record<Key, string> = {
-  'app.title': 'Stock coverage',
-  'app.site': 'Site {site}',
   'tab.consult': 'View',
   'tab.update': 'Update',
   'tab.settings': 'Settings',
   'context.loading': 'Loading the OneStock context…',
   'context.noSite': 'Site ID missing from the context',
   'token.missingTitle': 'onestock_token not found',
-  'token.missingText': 'Enter the OneStock API token in the Settings tab.',
+  'token.missingText': 'Enter the OneStock API token in the Settings.',
   'settings.created': 'First connection: settings initialised',
   'settings.createdText': 'Created with their default value: {keys}',
   'settings.unreadable': 'Settings could not be read',

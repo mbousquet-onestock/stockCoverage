@@ -41,20 +41,16 @@ watch(
 <template>
   <main class="app">
     <header class="head">
-      <h1 class="os-title-l title">{{ t('app.title') }}</h1>
-      <div class="head-right">
-        <span v-if="context.siteId" class="os-body-s site">{{ t('app.site', { site: context.siteId }) }}</span>
-        <!-- Hidden entry to the settings: invisible until hovered or focused (and shown while they are open). -->
-        <OsButton
-          class="settings-link"
-          :class="{ visible: tab === 'settings' }"
-          type="tertiary"
-          :text="t('tab.settings')"
-          @click="tab = 'settings'"
-        />
-      </div>
+      <OsTabs v-model="tab" :tabs="tabs" />
+      <!-- Hidden entry to the settings: invisible until hovered or focused (and shown while they are open). -->
+      <OsButton
+        class="settings-link"
+        :class="{ visible: tab === 'settings' }"
+        type="tertiary"
+        :text="t('tab.settings')"
+        @click="tab = 'settings'"
+      />
     </header>
-    <OsTabs v-model="tab" :tabs="tabs" />
 
     <OsAlert v-if="!context.ready" type="neutral" :subtitle="t('context.loading')" />
     <OsAlert v-else-if="!context.siteId" type="warning" :title="t('context.noSite')" />
@@ -86,10 +82,7 @@ watch(
 
 <style scoped>
 .app { padding: 16px; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
-.head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.title { margin: 0; color: var(--os-neutral-700); }
-.head-right { display: flex; align-items: center; gap: 8px; }
-.site { color: var(--os-neutral-300); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .settings-link { opacity: 0; transition: opacity 0.2s; }
 .settings-link:hover, .settings-link:focus-visible, .settings-link.visible { opacity: 1; }
 </style>
