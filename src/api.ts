@@ -1,6 +1,6 @@
 import { requestContext } from './settings';
 import type { OnestockContext } from './composables/useOnestockContext';
-import { chunk, READ_BATCH_SIZE, uploadPlan } from '#lib/coverage.js';
+import { chunk, itemName, matchEndpoints, READ_BATCH_SIZE, uploadPlan } from '#lib/coverage.js';
 
 export interface Coverage {
   item_id: string;
@@ -125,6 +125,75 @@ export async function getImport(context: OnestockContext, id: string) {
 /** PATCH /reset_stock_coverages: deletes every coverage created at or before `before` (unix timestamp). */
 export function resetCoverages(context: OnestockContext, before: number) {
   return onestock(context, 'PATCH', '/reset_stock_coverages', { before });
+}
+
+/** A search suggestion: the id to add, with what helps recognise it. */
+export interface Suggestion {
+  id: string;
+  label?: string;
+  detail?: string;
+}
+
+/** Items whose indexed fields (id, name, EAN… depending on the site) contain the text: GET /items `pattern`. */
+export async function searchItems(context: OnestockContext, pattern: string, limit = 10): Promise<Suggestion[]> {
+  const lang = (context.lang || 'fr').slice(0, 2);
+  const data = await onestock<{ items?: { id: string; product_id?: string; features?: Record<string, unknown> }[] }>(
+    context,
+    'GET',
+    '/items',
+    { pattern, features: ['name'], fields: ['product_id'], lang, pagination: { start: 0, limit } },
+  );
+  return (data.items || []).map((item) => ({
+    id: item.id,
+    label: itemName(item, lang),
+    detail: item.product_id && item.product_id !== item.id ? item.product_id : undefined,
+  }));
+}
+
+interface Endpoint {
+  id: string;
+  name?: string;
+  address?: { city?: string };
+}
+
+const ENDPOINTS_PAGE = 500;
+const ENDPOINTS_MAX = 10000;
+const endpointsCache = new Map<string, Promise<Endpoint[]>>();
+
+/**
+ * Every stock location of the site (GET /endpoints, by pages), loaded once per site and kept in memory:
+ * GET /endpoints has no text search, the matching is done in the browser.
+ */
+function allEndpoints(context: OnestockContext) {
+  const key = `${context.siteId}|${context.apiUrl}`;
+  let cached = endpointsCache.get(key);
+  if (!cached) {
+    cached = (async () => {
+      const endpoints: Endpoint[] = [];
+      for (let start = 0; start < ENDPOINTS_MAX; start += ENDPOINTS_PAGE) {
+        const data = await onestock<{ endpoints?: Endpoint[] }>(context, 'GET', '/endpoints', {
+          fields: ['_id', 'name', 'address.city'],
+          pagination: { start, limit: ENDPOINTS_PAGE },
+        });
+        const page = data.endpoints || [];
+        endpoints.push(...page);
+        if (page.length < ENDPOINTS_PAGE) break;
+      }
+      return endpoints;
+    })();
+    // A failure (token not set yet…) is not kept: the next search tries again.
+    cached.catch(() => endpointsCache.delete(key));
+    endpointsCache.set(key, cached);
+  }
+  return cached;
+}
+
+export async function searchEndpoints(context: OnestockContext, text: string, limit = 10): Promise<Suggestion[]> {
+  return (matchEndpoints(await allEndpoints(context), text, limit) as Endpoint[]).map((e) => ({
+    id: e.id,
+    label: e.name,
+    detail: e.address?.city,
+  }));
 }
 
 export function formatDate(timestamp: number | undefined, lang = 'fr') {

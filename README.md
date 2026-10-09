@@ -16,7 +16,7 @@ nouvelle). Les messages d'erreur renvoyés par les API (OneStock, Settings) sont
 
 | Onglet | Rôle | API OneStock |
 | --- | --- | --- |
-| **Consulter** | Recherche par articles × lieux de stock, modification en ligne des ventes / de l'assortiment, saisie des couples sans couverture, export CSV | `GET /stock_coverages`, `POST /stock_coverages` |
+| **Consulter** | Barre de filtres au format OneStock : Article et Lieu de stock (valeurs multiples, suggestions OneStock pendant la saisie), Assortiment, Couverture. Modification en ligne des ventes / de l'assortiment, saisie des couples sans couverture, export CSV | `GET /stock_coverages`, `POST /stock_coverages` ; suggestions : `GET /items` (`pattern`), `GET /endpoints` |
 | **Mettre à jour** | Saisie manuelle ou import CSV (`item_id;endpoint_id;sales_per_period;assortment`) ; ≤ 100 lignes : envoi direct, au-delà : import asynchrone par lots de 100. Réinitialisation des couvertures jusqu'à une date (avec confirmation) | `POST /stock_coverages`, `POST /stock_coverage_imports`, `POST /stock_coverage_imports/{id}/stock_coverages`, `PATCH /stock_coverage_imports/{id}`, `PATCH /reset_stock_coverages` |
 | **Imports** | Suivi des imports asynchrones (statut, lots, lignes importées / en erreur), actualisation automatique de l'import qui vient d'être envoyé | `GET /stock_coverage_imports`, `GET /stock_coverage_imports/{id}` |
 | **Paramètres** | Saisie du token OneStock et de la racine de l'API, lieux de stock par défaut, libellé de la période ; test de connexion | API Settings |
@@ -34,8 +34,12 @@ navigateur (iframe OneStock)             Vercel
 - Le navigateur n'appelle jamais OneStock directement : tous les appels passent par `POST /api/onestock-proxy`
   `{ context, method, path, body }`. Le proxy lit le token dans l'API Settings, ajoute `site_id` et `token` au corps,
   et utilise `POST` + `X-HTTP-Method-Override: GET` pour les routes GET à body.
-- Le proxy ne relaie que les routes de couverture de stock listées ci-dessus (`lib/onestock.js`) : le token ne
-  peut pas servir à appeler d'autres API depuis le navigateur.
+- Le proxy ne relaie que les routes de couverture de stock listées ci-dessus, plus `GET /items` et `GET /endpoints`
+  en lecture pour les suggestions (`lib/onestock.js`) : le token ne peut pas servir à appeler d'autres API depuis le
+  navigateur.
+- Suggestions : les articles sont cherchés par `GET /items` avec `pattern` (champs indexés du site : id, nom, EAN…).
+  `GET /endpoints` n'ayant pas de recherche textuelle, la liste des lieux de stock est chargée une fois (pages de 500)
+  et filtrée dans le navigateur sur l'id, le nom et la ville.
 - L'URL de l'API est, par ordre de priorité : `onestock_api_root`, celle reçue du contexte (`api_url`), sinon
   `https://{site_id}.api.qualif.onestock-retail.com` (ou `api.onestock-retail.com` en production) ; `/v3` est ajouté
   si aucune version n'est précisée.

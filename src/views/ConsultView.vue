@@ -1,32 +1,53 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { OsAlert, OsBadge, OsButton, OsCardLayout, OsCheckbox } from '#ds';
+import { OsAlert, OsBadge, OsButton, OsCardLayout, OsSelect } from '#ds';
 import type { OnestockContext } from '../composables/useOnestockContext';
-import { readCoverages, uploadCoverages, type Coverage } from '../api';
+import { readCoverages, searchEndpoints, searchItems, uploadCoverages, type Coverage } from '../api';
 import { setting } from '../settings';
 import { coverageKey, coveragesToCsv, missingPairs, parseIds } from '#lib/coverage.js';
 import { isDirty, rowCoverage, rowOf, type EditableRow } from '../rows';
 import { downloadText } from '../download';
 import { t } from '../i18n';
 import CoverageTable from '../components/CoverageTable.vue';
+import SearchField from '../components/SearchField.vue';
 
 const props = defineProps<{ context: OnestockContext }>();
 const emit = defineEmits<{ openImport: [id: string] }>();
 
-const itemsText = ref('');
-const endpointsText = ref('');
+const itemIds = ref<string[]>([]);
+const endpointIds = ref<string[]>([]);
+const itemField = ref<InstanceType<typeof SearchField>>();
+const endpointField = ref<InstanceType<typeof SearchField>>();
+const suggestItems = (text: string) => searchItems(props.context, text);
+const suggestEndpoints = (text: string) => searchEndpoints(props.context, text);
 const rows = ref<EditableRow[]>([]);
 const searched = ref<{ items: number; endpoints: number } | null>(null);
-const hideMissing = ref(false);
+/** Filters of the results (applied in the browser): '' = all. */
+const assortmentFilter = ref('');
+const coverageFilter = ref('');
 const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
 const success = ref('');
 
-const itemIds = computed(() => parseIds(itemsText.value));
-const endpointIds = computed(() => parseIds(endpointsText.value));
 const found = computed(() => rows.value.filter((r) => r.original).length);
-const shownRows = computed(() => (hideMissing.value ? rows.value.filter((r) => r.original || r.sales.trim()) : rows.value));
+const shownRows = computed(() =>
+  rows.value.filter(
+    (r) =>
+      (!assortmentFilter.value || String(r.assortment) === assortmentFilter.value) &&
+      (!coverageFilter.value || (coverageFilter.value === 'found') === Boolean(r.original)),
+  ),
+);
+const assortmentOptions = computed(() => [
+  { id: '', primaryText: t('consult.all') },
+  { id: 'true', primaryText: t('consult.inAssortment') },
+  { id: 'false', primaryText: t('consult.outOfAssortment') },
+]);
+const coverageOptions = computed(() => [
+  { id: '', primaryText: t('consult.all') },
+  { id: 'found', primaryText: t('consult.withCoverage') },
+  { id: 'missing', primaryText: t('consult.withoutCoverage') },
+]);
 const changed = computed(() => rows.value.filter(isDirty));
 const invalid = computed(() => changed.value.filter((r) => rowCoverage(r).error));
 
@@ -34,17 +55,21 @@ const invalid = computed(() => changed.value.filter((r) => rowCoverage(r).error)
 watch(
   () => [props.context.itemIds, props.context.endpointIds, setting('default_endpoint_ids')] as const,
   () => {
-    if (!itemsText.value && props.context.itemIds.length) itemsText.value = props.context.itemIds.join('\n');
-    if (!endpointsText.value) {
-      endpointsText.value = props.context.endpointIds.length
-        ? props.context.endpointIds.join('\n')
-        : parseIds(setting('default_endpoint_ids')).join('\n');
+    if (!itemIds.value.length && props.context.itemIds.length) itemIds.value = [...props.context.itemIds];
+    if (!endpointIds.value.length) {
+      endpointIds.value = props.context.endpointIds.length
+        ? [...props.context.endpointIds]
+        : parseIds(setting('default_endpoint_ids'));
     }
   },
   { immediate: true },
 );
 
 async function search() {
+  // Text typed but not validated yet counts too.
+  itemField.value?.commit();
+  endpointField.value?.commit();
+  if (!itemIds.value.length || !endpointIds.value.length || loading.value) return;
   error.value = '';
   success.value = '';
   loading.value = true;
@@ -105,31 +130,48 @@ function exportCsv() {
 
 <template>
   <section class="view">
-    <OsCardLayout>
-      <div class="group">
-        <div class="os-label-l">{{ t('consult.title') }}</div>
-        <div class="row">
-          <label class="textarea">
-            <span class="os-body-m">{{ t('consult.items') }}</span>
-            <textarea v-model="itemsText" class="os-label-s" rows="5" :placeholder="t('consult.itemsPlaceholder')" />
-            <span class="os-body-s hint">{{ t('consult.itemsCount', { n: itemIds.length }) }}</span>
-          </label>
-          <label class="textarea">
-            <span class="os-body-m">{{ t('consult.endpoints') }}</span>
-            <textarea v-model="endpointsText" class="os-label-s" rows="5" placeholder="store_1, warehouse_2…" />
-            <span class="os-body-s hint">{{ t('consult.endpointsCount', { n: endpointIds.length }) }}</span>
-          </label>
-        </div>
-        <div class="actions">
-          <OsButton
-            :text="t('consult.search')"
-            :pending="loading"
-            :disabled="!itemIds.length || !endpointIds.length"
-            @click="search"
-          />
-        </div>
+    <div class="filter-bar">
+      <SearchField
+        ref="itemField"
+        v-model="itemIds"
+        :label="t('consult.item')"
+        :placeholder="t('consult.itemPlaceholder')"
+        :remove-label="t('table.remove')"
+        :suggest="suggestItems"
+        :min-chars="2"
+        :loading-text="t('consult.searching')"
+        :empty-text="t('consult.noMatch')"
+        @search="search"
+      />
+      <SearchField
+        ref="endpointField"
+        v-model="endpointIds"
+        :label="t('consult.endpoint')"
+        :placeholder="t('consult.endpointPlaceholder')"
+        :remove-label="t('table.remove')"
+        :suggest="suggestEndpoints"
+        :min-chars="1"
+        :loading-text="t('consult.searching')"
+        :empty-text="t('consult.noMatch')"
+        @search="search"
+      />
+      <div class="filter-select">
+        <OsSelect v-model="assortmentFilter" :label="t('consult.assortment')" :options="assortmentOptions" />
       </div>
-    </OsCardLayout>
+      <div class="filter-select">
+        <OsSelect v-model="coverageFilter" :label="t('consult.coverage')" :options="coverageOptions" />
+      </div>
+      <div class="filter-action">
+        <OsButton
+          type="secondary"
+          :text="t('consult.search')"
+          :pending="loading"
+          :disabled="!itemIds.length || !endpointIds.length"
+          @click="search"
+        />
+      </div>
+    </div>
+    <span class="os-body-s hint">{{ t('consult.searchHint') }}</span>
 
     <OsAlert v-if="error" type="danger" :title="t('common.error')" :subtitle="error" />
     <OsAlert v-if="success" type="success" :subtitle="success" />
@@ -148,7 +190,6 @@ function exportCsv() {
           </div>
         </div>
         <span class="os-body-s hint">{{ t('consult.hint', { period: setting('period_label') || t('common.period') }) }}</span>
-        <OsCheckbox v-model="hideMissing" :label="t('consult.hideMissing')" />
         <CoverageTable :rows="shownRows" :period-label="setting('period_label')" />
         <OsAlert
           v-if="invalid.length"
@@ -172,18 +213,14 @@ function exportCsv() {
 
 <style scoped>
 .view { display: flex; flex-direction: column; gap: 16px; }
+.filter-bar { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+.filter-select { flex: 1 1 160px; min-width: 150px; max-width: 240px; display: flex; }
+.filter-action { margin-left: auto; padding-top: 20px; }
+.view > .hint { margin-top: -8px; }
 .group { display: flex; flex-direction: column; gap: 12px; }
 .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .badges { display: flex; gap: 8px; flex-wrap: wrap; }
-.row { display: flex; gap: 12px; flex-wrap: wrap; }
-.row > * { flex: 1; min-width: 220px; }
 .hint { color: var(--os-neutral-300); }
-.textarea { display: flex; flex-direction: column; gap: 2px; color: var(--os-neutral-500); }
-.textarea textarea {
-  resize: vertical; padding: 8px 12px; border: 1px solid var(--os-neutral-100); border-radius: var(--os-radius);
-  color: var(--os-neutral-700); outline: none; font-family: Roboto, sans-serif;
-}
-.textarea textarea:focus { border-color: var(--os-primary-1000); }
 .actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .actions .left { margin-right: auto; }
 </style>
