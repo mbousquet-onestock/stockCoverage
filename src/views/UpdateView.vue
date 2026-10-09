@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { OsAlert, OsBadge, OsButton, OsCardLayout, OsCheckbox, OsDivider, OsInputText } from '#ds';
 import type { OnestockContext } from '../composables/useOnestockContext';
-import { resetCoverages, uploadCoverages, type UploadProgress } from '../api';
+import { resetCoverages, searchEndpoints, searchItems, uploadCoverages, type UploadProgress } from '../api';
 import { setting } from '../settings';
 import { endOfDayTimestamp, MAX_SYNC_COVERAGES, parseCoveragesCsv, uploadPlan } from '#lib/coverage.js';
 import { rowCoverage, rowOf, type EditableRow } from '../rows';
@@ -21,6 +21,8 @@ const error = ref('');
 const success = ref('');
 
 const periodLabel = computed(() => setting('period_label'));
+const suggestItems = (text: string) => searchItems(props.context, text);
+const suggestEndpoints = (text: string) => searchEndpoints(props.context, text);
 /** Lines left completely empty are ignored. */
 const filled = computed(() => rows.value.filter((r) => r.item_id || r.endpoint_id || r.sales.trim()));
 const invalid = computed(() => filled.value.filter((r) => rowCoverage(r).error));
@@ -158,7 +160,15 @@ async function reset() {
           <OsBadge v-if="filled.length" :text="t('update.lines', { n: filled.length })" color="blue" />
         </div>
         <span class="os-body-s hint">{{ t('update.hint') }}</span>
-        <CoverageTable :rows="rows" editable-ids removable :period-label="periodLabel" @remove="remove" />
+        <CoverageTable
+          :rows="rows"
+          editable-ids
+          removable
+          :period-label="periodLabel"
+          :suggest-item="suggestItems"
+          :suggest-endpoint="suggestEndpoints"
+          @remove="remove"
+        />
         <div class="actions">
           <OsButton class="left" type="tertiary" :text="t('update.addRow')" @click="addRow" />
           <OsButton type="tertiary" :text="t('update.clear')" @click="clearAll" />

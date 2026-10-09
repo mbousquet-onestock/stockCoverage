@@ -36,6 +36,7 @@ const fr = {
   'table.changed': 'Modifiée',
   'table.shown': '{shown} lignes affichées sur {total}',
   'table.more': 'Afficher plus',
+  'table.noMatch': 'Aucun résultat : la valeur saisie est conservée',
 
   'error.item_id_missing': 'item_id manquant',
   'error.endpoint_id_missing': 'endpoint_id manquant',
@@ -187,6 +188,7 @@ const en: Record<Key, string> = {
   'table.changed': 'Changed',
   'table.shown': '{shown} of {total} lines shown',
   'table.more': 'Show more',
+  'table.noMatch': 'No result: the typed value is kept',
 
   'error.item_id_missing': 'item_id missing',
   'error.endpoint_id_missing': 'endpoint_id missing',

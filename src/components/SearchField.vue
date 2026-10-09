@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { ref } from 'vue';
 import { parseIds } from '#lib/coverage.js';
 import type { Suggestion } from '../api';
+import { useSuggestions, type SuggestFn } from '../composables/useSuggestions';
+import SuggestList from './SuggestList.vue';
 
 /**
  * Search field of the OneStock filter bar: label above, magnifier inside, several values shown as chips.
@@ -14,13 +16,13 @@ const props = withDefaults(
     label: string;
     placeholder?: string;
     removeLabel?: string;
-    suggest?: (text: string) => Promise<Suggestion[]>;
-    /** Characters to type before suggestions are asked for (0: as soon as the field gets the focus). */
+    suggest?: SuggestFn;
+    /** Characters to type before suggestions are asked for. */
     minChars?: number;
     loadingText?: string;
     emptyText?: string;
   }>(),
-  { minChars: 2, loadingText: '…', emptyText: '' },
+  { minChars: 2 },
 );
 const values = defineModel<string[]>({ required: true });
 const emit = defineEmits<{ search: [] }>();
@@ -28,19 +30,8 @@ const emit = defineEmits<{ search: [] }>();
 const text = ref('');
 const MAX_CHIPS = 6;
 const expanded = ref(false);
-
-const suggestions = ref<Suggestion[]>([]);
-const open = ref(false);
-const loading = ref(false);
-const suggestError = ref('');
-const active = ref(-1);
-let timer: ReturnType<typeof setTimeout> | undefined;
-let request = 0;
-/** Lookup running or waiting for the debounce, so that Enter can wait for its answer. */
-let pending: Promise<void> | null = null;
 const listId = `suggest-${Math.random().toString(36).slice(2)}`;
-
-const visibleSuggestions = computed(() => suggestions.value.filter((s) => !values.value.includes(s.id)));
+const s = useSuggestions({ suggest: () => props.suggest, minChars: () => props.minChars, exclude: () => values.value });
 
 function add(ids: string[]) {
   if (ids.length) values.value = [...new Set([...values.value, ...ids])];
@@ -49,81 +40,27 @@ function add(ids: string[]) {
 function commit() {
   const ids = parseIds(text.value);
   text.value = '';
-  close();
+  s.close();
   add(ids);
   return ids.length > 0;
-}
-
-function close() {
-  open.value = false;
-  active.value = -1;
-  clearTimeout(timer);
-  request++;
-  loading.value = false;
-}
-
-function canSuggest() {
-  return Boolean(props.suggest) && text.value.trim().length >= props.minChars;
-}
-
-async function run(id: number, query: string) {
-  open.value = true;
-  loading.value = true;
-  suggestError.value = '';
-  try {
-    const found = await props.suggest!(query);
-    if (id !== request) return;
-    suggestions.value = found;
-    active.value = visibleSuggestions.value.length ? 0 : -1;
-  } catch (err) {
-    if (id !== request) return;
-    suggestions.value = [];
-    suggestError.value = (err as Error).message;
-  } finally {
-    if (id === request) loading.value = false;
-  }
-}
-
-function lookup(delay = 300) {
-  clearTimeout(timer);
-  if (!canSuggest()) {
-    close();
-    return;
-  }
-  const id = ++request;
-  const query = text.value.trim();
-  pending = new Promise<void>((resolve) => {
-    timer = setTimeout(() => run(id, query).finally(resolve), delay);
-  });
 }
 
 function pick(suggestion: Suggestion) {
   add([suggestion.id]);
   text.value = '';
-  close();
+  s.close();
 }
 
 async function onEnter() {
-  // Typed faster than the debounce, or answer not back yet: wait for the suggestions.
-  if (canSuggest() && (loading.value || !open.value)) {
-    if (!open.value) lookup(0);
-    await pending;
-  }
-  const chosen = open.value ? visibleSuggestions.value[active.value] : undefined;
+  const chosen = await s.settle(text.value);
   if (chosen) return pick(chosen);
   if (commit()) return;
   emit('search');
 }
 
-function move(step: number) {
-  if (!open.value) return lookup();
-  const n = visibleSuggestions.value.length;
-  if (n) active.value = (active.value + step + n) % n;
-}
-
 function onInput() {
   if (/[,;\n]/.test(text.value)) commit();
-  else lookup();
+  else s.lookup(text.value);
 }
 
 function onPaste(event: ClipboardEvent) {
@@ -138,15 +75,11 @@ function onBackspace() {
   if (!text.value && values.value.length) values.value = values.value.slice(0, -1);
 }
 
-function onFocus() {
-  if (props.minChars === 0) lookup();
-}
-
 /** Leaving the field keeps what was typed as a value (after a click in the list has been handled). */
 function onBlur() {
   setTimeout(() => {
     if (text.value.trim()) commit();
-    else close();
+    else s.close();
   }, 150);
 }
 
@@ -154,7 +87,6 @@ function remove(id: string) {
   values.value = values.value.filter((v) => v !== id);
 }
 
-onBeforeUnmount(() => clearTimeout(timer));
 defineExpose({ commit });
 </script>
 
@@ -168,17 +100,16 @@ defineExpose({ commit });
           class="os-label-s"
           role="combobox"
           autocomplete="off"
-          :aria-expanded="open"
+          :aria-expanded="s.open.value"
           :aria-controls="listId"
           :placeholder="placeholder"
           @keydown.enter.prevent="onEnter"
-          @keydown.down.prevent="move(1)"
-          @keydown.up.prevent="move(-1)"
-          @keydown.esc="close"
+          @keydown.down.prevent="s.move(1, text)"
+          @keydown.up.prevent="s.move(-1, text)"
+          @keydown.esc="s.close()"
           @keydown.backspace="onBackspace"
           @input="onInput"
           @paste="onPaste"
-          @focus="onFocus"
           @blur="onBlur"
         />
         <button type="button" class="icon" tabindex="-1" :aria-label="props.label" @click="onEnter">
@@ -189,28 +120,20 @@ defineExpose({ commit });
             />
           </svg>
         </button>
+        <SuggestList
+          v-if="s.open.value"
+          :id="listId"
+          :suggestions="s.visible.value"
+          :active="s.active.value"
+          :loading="s.loading.value"
+          :error="s.error.value"
+          :loading-text="loadingText"
+          :empty-text="emptyText"
+          @pick="pick"
+          @hover="(i) => (s.active.value = i)"
+        />
       </span>
     </label>
-
-    <ul v-if="open" :id="listId" class="suggestions" role="listbox">
-      <li v-if="loading" class="info os-body-s">{{ loadingText }}</li>
-      <li v-else-if="suggestError" class="info error os-body-s">{{ suggestError }}</li>
-      <li v-else-if="!visibleSuggestions.length" class="info os-body-s">{{ emptyText }}</li>
-      <li
-        v-for="(suggestion, i) in loading ? [] : visibleSuggestions"
-        :key="suggestion.id"
-        role="option"
-        :aria-selected="i === active"
-        :class="{ active: i === active }"
-        @mousedown.prevent="pick(suggestion)"
-        @mouseenter="active = i"
-      >
-        <span class="os-label-s id">{{ suggestion.id }}</span>
-        <span v-if="suggestion.label || suggestion.detail" class="os-body-s detail">
-          {{ [suggestion.label, suggestion.detail].filter(Boolean).join(' · ') }}
-        </span>
-      </li>
-    </ul>
 
     <div v-if="values.length" class="chips">
       <span v-for="id in expanded ? values : values.slice(0, MAX_CHIPS)" :key="id" class="chip os-body-s">
@@ -226,12 +149,12 @@ defineExpose({ commit });
 
 <style scoped>
 .search-field {
-  position: relative; display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: 6px;
   flex: 1 1 220px; min-width: 200px; max-width: 320px;
 }
 .label { display: flex; flex-direction: column; gap: 4px; color: var(--os-neutral-500); }
 .field {
-  display: flex; align-items: center; height: 36px; border: 1px solid var(--os-neutral-100);
+  position: relative; display: flex; align-items: center; height: 36px; border: 1px solid var(--os-neutral-100);
   border-radius: var(--os-radius); background: #fff;
 }
 .field:focus-within { border-color: var(--os-primary-1000); }
@@ -245,17 +168,6 @@ defineExpose({ commit });
   border: none; background: none; color: var(--os-neutral-300); cursor: pointer;
 }
 .icon:hover { color: var(--os-primary-1000); }
-.suggestions {
-  position: absolute; top: 60px; left: 0; right: 0; z-index: 10; margin: 0; padding: 4px 0; list-style: none;
-  max-height: 280px; overflow-y: auto; background: #fff; border: 1px solid var(--os-neutral-100);
-  border-radius: var(--os-radius); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-.suggestions li { display: flex; flex-direction: column; padding: 6px 12px; cursor: pointer; }
-.suggestions li.active { background: var(--os-primary-t-100); }
-.suggestions li.info { cursor: default; color: var(--os-neutral-300); }
-.suggestions li.error { color: var(--os-red-1000); }
-.id { color: var(--os-neutral-700); overflow-wrap: anywhere; }
-.detail { color: var(--os-neutral-300); overflow-wrap: anywhere; }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip {
   display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 8px; border-radius: 12px;
